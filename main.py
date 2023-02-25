@@ -6,7 +6,7 @@ from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from dotenv import load_dotenv
 import os
-
+from bs4 import BeautifulSoup
 
 class LinkedInJobsScraper:
     LOGIN_URL = 'https://www.linkedin.com/login'
@@ -18,14 +18,15 @@ class LinkedInJobsScraper:
 
     JOB_LIST_BLOCK_CLASSNAME = 'scaffold-layout__list-container'
     JOB_LIST_ITEM_CLASSNAME = '.jobs-search-results__list-item'
-    JOB_ITEM_CLASSNAME = 'p5'
+    JOB_HEADER_CLASSNAME = 'p5'
+    JOB_DESCRIPTION_CLASSNAME = 'jobs-box__html-content'
     JOB_LINK_TAGNAME = 'a'
-    JOB_TITLE_TAGNAME = 'h1'
+    JOB_TITLE_CLASSNAME = 'jobs-unified-top-card__job-title'
     COMPANY_NAME_CLASSNAME = 'jobs-unified-top-card__company-name'
     LOCATION_CLASSNAME = 'jobs-unified-top-card__bullet'
     JOB_TYPE_CLASSNAME = 'jobs-unified-top-card__workplace-type'
     POST_DATE_CLASSNAME = 'jobs-unified-top-card__posted-date'
-    JOB_DESC_CLASSNAME = 'jobs-box__html-content'
+    APPLICANT_COUNT_CLASSNAME = 'jobs-unified-top-card__applicant-count'
     SHOW_MORE_BUTTON_XPATH = '//*[@id="ember33"]'
 
     def __init__(self):
@@ -54,10 +55,11 @@ class LinkedInJobsScraper:
 
     def scrape_job_links(self):
         job_links = []
+        self.wait.until(
+            EC.presence_of_element_located((By.XPATH, '//*[@id="ember13"]'))).click()  # Accept cookies
+        logging.info(f"Cookies accepted.")
         for page in range(2, 3):
             try:
-                self.wait.until(
-                    EC.presence_of_element_located((By.XPATH, '//*[@id="ember13"]'))).click()  # Accept cookies
                 logging.info(f"Collecting job offer links just started on the page {page-1}")
                 self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, self.JOB_LIST_BLOCK_CLASSNAME)))
                 jobs_block = self.driver.find_element(By.CLASS_NAME, self.JOB_LIST_BLOCK_CLASSNAME)
@@ -83,27 +85,31 @@ class LinkedInJobsScraper:
             logging.info(f"Visiting the link and collecting information just started.")
             self.driver.get(job_link)
             self.wait.until(EC.element_to_be_clickable((By.XPATH, self.SHOW_MORE_BUTTON_XPATH))).click()  # Show More
-            logging.info(f"Cookies accepted.")
             logging.info(f"Finding the general information of a job offer: {job_link}.")
-            job_description = self.wait.until(
-                EC.presence_of_all_elements_located((By.CLASS_NAME, self.JOB_ITEM_CLASSNAME)))
+            html = self.driver.page_source
+            soup = BeautifulSoup(html, 'html.parser')
 
-            job_data['Job Title'] = job_description.find_element(By.TAG_NAME, self.JOB_TITLE_TAGNAME).text
+            job_description_header = soup.find('div', {'class': self.JOB_HEADER_CLASSNAME})
+
+            job_data['Job Title'] = job_description_header.find('h1', {'class': self.JOB_TITLE_CLASSNAME}).text.strip()
             logging.info(f"Scraped information for {job_data['Job Title']}")
 
-            job_data['Company Name'] = job_description.find_element(By.CLASS_NAME, self.COMPANY_NAME_CLASSNAME).text
+            job_data['Company Name'] = job_description_header.find('span', {'class': self.COMPANY_NAME_CLASSNAME}).text.strip()
             logging.info(f"Scraped information for {job_data['Company Name']}")
 
-            job_data['Location'] = job_description.find_element(By.CLASS_NAME, self.LOCATION_CLASSNAME).text
+            job_data['Location'] = job_description_header.find('span', {'class': self.LOCATION_CLASSNAME}).text.strip()
             logging.info(f"Scraped information for {job_data['Location']}")
 
-            job_data['Job Type'] = job_description.find_element(By.CLASS_NAME, self.JOB_TYPE_CLASSNAME).text
+            job_data['Job Type'] = job_description_header.find('span', {'class': self.JOB_TYPE_CLASSNAME}).text.strip()
             logging.info(f"Scraped information for {job_data['Job Type']}")
 
-            job_data['Post Date'] = job_description.find_element(By.CLASS_NAME, self.POST_DATE_CLASSNAME).text
+            job_data['Post Date'] = job_description_header.find('span', {'class': self.POST_DATE_CLASSNAME}).text.strip()
             logging.info(f"Scraped information for {job_data['Post Date']}")
 
-            job_data['Job Description'] = job_description.find_element(By.CLASS_NAME, self.JOB_DESC_CLASSNAME).text
+            job_data['Applicant Count'] = job_description_header.find('span', {'class': self.APPLICANT_COUNT_CLASSNAME}).text.strip()
+            logging.info(f"Scraped information for {job_data['Applicant Count']}")
+
+            job_data['Job Description'] = soup.find('div', {'class': self.JOB_DESCRIPTION_CLASSNAME}).text.strip()
             logging.info(f"Scraped information for {job_data['Job Description']}")
 
         except Exception as e:
@@ -117,7 +123,6 @@ class LinkedInJobsScraper:
             self.login()
             self.driver.get(self.JOB_SEARCH_URL)
             job_links = self.scrape_job_links()
-            print(job_links)
             job_data = [self.scrape_job_info(job_link) for job_link in job_links]
             print(job_data)
             df = pd.DataFrame(job_data)
