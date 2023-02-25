@@ -1,6 +1,7 @@
 import logging
 import pandas as pd
 from selenium import webdriver
+from selenium.common import TimeoutException, NoSuchElementException
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -26,7 +27,7 @@ class LinkedInJobsScraper:
     LOCATION_CLASSNAME = 'jobs-unified-top-card__bullet'
     JOB_TYPE_CLASSNAME = 'jobs-unified-top-card__workplace-type'
     POST_DATE_CLASSNAME = 'jobs-unified-top-card__posted-date'
-    APPLICANT_COUNT_CLASSNAME = 'jobs-unified-top-card__applicant-count'
+    APPLICANT_COUNT_CLASSNAME = 'jobs-unified-top-card__applicant'
     SHOW_MORE_BUTTON_XPATH = '//*[@id="ember33"]'
 
     def __init__(self):
@@ -89,31 +90,66 @@ class LinkedInJobsScraper:
             html = self.driver.page_source
             soup = BeautifulSoup(html, 'html.parser')
 
+            job_header_locator = (By.CLASS_NAME, self.JOB_HEADER_CLASSNAME)
+            WebDriverWait(self.driver, 10).until(EC.presence_of_element_located(job_header_locator))
+
             job_description_header = soup.find('div', {'class': self.JOB_HEADER_CLASSNAME})
 
-            job_data['Job Title'] = job_description_header.find('h1', {'class': self.JOB_TITLE_CLASSNAME}).text.strip()
-            logging.info(f"Scraped information for {job_data['Job Title']}")
+            job_title_elem = job_description_header.find('h1', {'class': self.JOB_TITLE_CLASSNAME})
+            if job_title_elem:
+                job_data['Job Title'] = job_title_elem.text.strip()
+                logging.info(f"Scraped information for {job_data['Job Title']}")
+            else:
+                raise Exception('Job title not found.')
 
-            job_data['Company Name'] = job_description_header.find('span', {'class': self.COMPANY_NAME_CLASSNAME}).text.strip()
-            logging.info(f"Scraped information for {job_data['Company Name']}")
+            company_name_elem = job_description_header.find('span', {'class': self.COMPANY_NAME_CLASSNAME})
+            if company_name_elem:
+                job_data['Company Name'] = company_name_elem.text.strip()
+                logging.info(f"Scraped information for {job_data['Company Name']}")
+            else:
+                raise Exception('Company name not found.')
 
-            job_data['Location'] = job_description_header.find('span', {'class': self.LOCATION_CLASSNAME}).text.strip()
-            logging.info(f"Scraped information for {job_data['Location']}")
+            location_elem = job_description_header.find('span', {'class': self.LOCATION_CLASSNAME})
+            if location_elem:
+                job_data['Location'] = location_elem.text.strip()
+                logging.info(f"Scraped information for {job_data['Location']}")
+            else:
+                raise Exception('Location not found.')
 
-            job_data['Job Type'] = job_description_header.find('span', {'class': self.JOB_TYPE_CLASSNAME}).text.strip()
-            logging.info(f"Scraped information for {job_data['Job Type']}")
+            job_type_elem = job_description_header.find('span', {'class': self.JOB_TYPE_CLASSNAME})
+            if job_type_elem:
+                job_data['Job Type'] = job_type_elem.text.strip()
+                logging.info(f"Scraped information for {job_data['Job Type']}")
+            else:
+                raise Exception('Job type not found.')
 
-            job_data['Post Date'] = job_description_header.find('span', {'class': self.POST_DATE_CLASSNAME}).text.strip()
-            logging.info(f"Scraped information for {job_data['Post Date']}")
+            post_date_elem = job_description_header.find('span', {'class': self.POST_DATE_CLASSNAME})
+            if post_date_elem:
+                job_data['Post Date'] = post_date_elem.text.strip()
+                logging.info(f"Scraped information for {job_data['Post Date']}")
+            else:
+                raise Exception('Post date not found.')
 
-            job_data['Applicant Count'] = job_description_header.find('span', {'class': self.APPLICANT_COUNT_CLASSNAME}).text.strip()
-            logging.info(f"Scraped information for {job_data['Applicant Count']}")
+            applicant_count_elem = job_description_header.find('span', {'class': self.APPLICANT_COUNT_CLASSNAME})
+            if applicant_count_elem:
+                job_data['Applicant Count'] = applicant_count_elem.text.strip()
+                logging.info(f"Scraped information for {job_data['Applicant Count']}")
+            else:
+                raise Exception('Applicant count not found.')
 
-            job_data['Job Description'] = soup.find('div', {'class': self.JOB_DESCRIPTION_CLASSNAME}).text.strip()
-            logging.info(f"Scraped information for {job_data['Job Description']}")
+            job_description_elem = soup.find('div', {'class': self.JOB_DESCRIPTION_CLASSNAME})
+            if job_description_elem:
+                job_data['Job Description'] = job_description_elem.text.strip()
+                logging.info(f"Scraped information for {job_data['Job Description']}")
+            else:
+                raise Exception('Job description not found.')
 
+        except TimeoutException as e:
+            logging.error(f'Error: Timeout occurred while waiting for an element to load on page: {e}\nfor {job_link}')
+        except NoSuchElementException as e:
+            logging.error(f'Error: Element not found while scraping job information: {e}\nfor {job_link}')
         except Exception as e:
-            logging.error(f'Error occurred while scraping job information for {job_link}: {e}')
+            logging.error(f'Error occurred while scraping job information: {e}\nfor {job_link}')
         else:
             logging.info(f"Scraping the Job Offer {job_data} DONE.")
             return job_data
@@ -124,7 +160,6 @@ class LinkedInJobsScraper:
             self.driver.get(self.JOB_SEARCH_URL)
             job_links = self.scrape_job_links()
             job_data = [self.scrape_job_info(job_link) for job_link in job_links]
-            print(job_data)
             df = pd.DataFrame(job_data)
             df.to_csv('job_offers.csv', index=False)
             logging.info(f'Saved data for {len(job_data)} job offers')
@@ -138,4 +173,3 @@ if __name__ == '__main__':
     logging.basicConfig(format='%(asctime)s - %(levelname)s - %(message)s', level=logging.INFO)
     scraper = LinkedInJobsScraper()
     scraper.scrape_jobs()
-
