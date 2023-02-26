@@ -27,7 +27,7 @@ class LinkedInJobsScraper:
     LOCATION_CLASSNAME = 'jobs-unified-top-card__bullet'
     JOB_TYPE_CLASSNAME = 'jobs-unified-top-card__workplace-type'
     POST_DATE_CLASSNAME = 'jobs-unified-top-card__posted-date'
-    APPLICANT_COUNT_CLASSNAME = 'jobs-unified-top-card__applicant'
+    APPLICANT_COUNT_CLASSNAME = 'jobs-unified-top-card__applicant-count'
     SHOW_MORE_BUTTON_XPATH = '//*[@id="ember33"]'
 
     def __init__(self):
@@ -64,14 +64,14 @@ class LinkedInJobsScraper:
                 logging.info(f"Collecting job offer links just started on the page {page-1}")
                 self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, self.JOB_LIST_BLOCK_CLASSNAME)))
                 jobs_block = self.driver.find_element(By.CLASS_NAME, self.JOB_LIST_BLOCK_CLASSNAME)
-                logging.info(f"Scraped information for jobs_block: {jobs_block}")
+                logging.info(f"Scraped information for jobs_block.")
                 jobs_list = jobs_block.find_elements(By.CSS_SELECTOR, self.JOB_LIST_ITEM_CLASSNAME)
-                logging.info(f"Scraped information for jobs_list: {jobs_list}")
-                for each_job in jobs_list[:3]:
+                logging.info(f"Scraped information for jobs_list.")
+                for each_job in jobs_list[:2]:
                     each_job_links = each_job.find_elements(By.TAG_NAME, self.JOB_LINK_TAGNAME)
-                    logging.info(f"Scraped information for {jobs_list}")
                     for each_job_link in each_job_links:
-                        if str(each_job_link.get_attribute('href')).startswith("https://www.linkedin.com/jobs/view") and each_job_link.get_attribute('href') not in job_links:
+                        if str(each_job_link.get_attribute('href')).startswith("https://www.linkedin.com/jobs/view") \
+                                and each_job_link.get_attribute('href') not in job_links:
                             job_links.append(each_job_link.get_attribute("href"))
                     self.driver.execute_script("arguments[0].scrollIntoView();", each_job)
             except Exception as e:
@@ -91,7 +91,7 @@ class LinkedInJobsScraper:
             soup = BeautifulSoup(html, 'html.parser')
 
             job_header_locator = (By.CLASS_NAME, self.JOB_HEADER_CLASSNAME)
-            WebDriverWait(self.driver, 10).until(EC.presence_of_element_located(job_header_locator))
+            self.wait.until(EC.presence_of_element_located(job_header_locator))
 
             job_description_header = soup.find('div', {'class': self.JOB_HEADER_CLASSNAME})
 
@@ -100,6 +100,7 @@ class LinkedInJobsScraper:
                 job_data['Job Title'] = job_title_elem.text.strip()
                 logging.info(f"Scraped information for {job_data['Job Title']}")
             else:
+                job_data['Job Title'] = 'None'
                 raise Exception('Job title not found.')
 
             company_name_elem = job_description_header.find('span', {'class': self.COMPANY_NAME_CLASSNAME})
@@ -107,6 +108,7 @@ class LinkedInJobsScraper:
                 job_data['Company Name'] = company_name_elem.text.strip()
                 logging.info(f"Scraped information for {job_data['Company Name']}")
             else:
+                job_data['Company Name'] = 'None'
                 raise Exception('Company name not found.')
 
             location_elem = job_description_header.find('span', {'class': self.LOCATION_CLASSNAME})
@@ -114,6 +116,7 @@ class LinkedInJobsScraper:
                 job_data['Location'] = location_elem.text.strip()
                 logging.info(f"Scraped information for {job_data['Location']}")
             else:
+                job_data['Location'] = 'None'
                 raise Exception('Location not found.')
 
             job_type_elem = job_description_header.find('span', {'class': self.JOB_TYPE_CLASSNAME})
@@ -121,6 +124,7 @@ class LinkedInJobsScraper:
                 job_data['Job Type'] = job_type_elem.text.strip()
                 logging.info(f"Scraped information for {job_data['Job Type']}")
             else:
+                job_data['Job Type'] = 'None'
                 raise Exception('Job type not found.')
 
             post_date_elem = job_description_header.find('span', {'class': self.POST_DATE_CLASSNAME})
@@ -128,20 +132,29 @@ class LinkedInJobsScraper:
                 job_data['Post Date'] = post_date_elem.text.strip()
                 logging.info(f"Scraped information for {job_data['Post Date']}")
             else:
+                job_data['Post Date'] = 'None'
                 raise Exception('Post date not found.')
 
+            WebDriverWait(self.driver, 50).until(EC.presence_of_element_located((By.CLASS_NAME, self.APPLICANT_COUNT_CLASSNAME)))
             applicant_count_elem = job_description_header.find('span', {'class': self.APPLICANT_COUNT_CLASSNAME})
-            if applicant_count_elem:
-                job_data['Applicant Count'] = applicant_count_elem.text.strip()
-                logging.info(f"Scraped information for {job_data['Applicant Count']}")
+            if applicant_count_elem is not None:
+                applicant_count_text = applicant_count_elem.text.strip()
+                try:
+                    job_data['Applicant Count'] = int(applicant_count_text.split()[0])
+                    logging.info(f"Scraped information for {job_data['Applicant Count']} applicants")
+                except ValueError:
+                    logging.warning(f"Could not parse applicant count from text: {applicant_count_text}")
+                    job_data['Applicant Count'] = 'None'
             else:
-                raise Exception('Applicant count not found.')
+                logging.warning('Applicant count not found.')
+                job_data['Applicant Count'] = 'None'
 
             job_description_elem = soup.find('div', {'class': self.JOB_DESCRIPTION_CLASSNAME})
             if job_description_elem:
                 job_data['Job Description'] = job_description_elem.text.strip()
                 logging.info(f"Scraped information for {job_data['Job Description']}")
             else:
+                job_data['Job Description'] = 'None'
                 raise Exception('Job description not found.')
 
         except TimeoutException as e:
@@ -151,7 +164,7 @@ class LinkedInJobsScraper:
         except Exception as e:
             logging.error(f'Error occurred while scraping job information: {e}\nfor {job_link}')
         else:
-            logging.info(f"Scraping the Job Offer {job_data} DONE.")
+            logging.info(f"Scraping the Job Offer DONE.")
             return job_data
 
     def scrape_jobs(self):
@@ -161,6 +174,7 @@ class LinkedInJobsScraper:
             job_links = self.scrape_job_links()
             job_data = [self.scrape_job_info(job_link) for job_link in job_links]
             df = pd.DataFrame(job_data)
+            print(df)
             df.to_csv('job_offers.csv', index=False)
             logging.info(f'Saved data for {len(job_data)} job offers')
         except Exception as e:
