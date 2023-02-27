@@ -2,6 +2,7 @@ import logging
 import pandas as pd
 from selenium import webdriver
 from selenium.common import TimeoutException, NoSuchElementException
+from selenium.webdriver import ActionChains
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -39,9 +40,10 @@ class LinkedInJobsScraper:
 
     LAST_PAGE = 3
 
+    # Initialize class variables and set up the Selenium driver
     def __init__(self):
         if "RAILWAY_ENVIRONMENT" in os.environ:
-            # Setup for Railway
+            # Check if the script is running on the Railway platform
             user_name = os.environ.get("USER_NAME")
             password = os.environ.get("PASSWORD")
         else:
@@ -50,6 +52,7 @@ class LinkedInJobsScraper:
             user_name = os.environ.get("USER_NAME")
             password = os.environ.get("PASSWORD")
 
+        # Store credentials and create Selenium driver
         self.username = user_name
         self.password = password
         self.driver = webdriver.Chrome()
@@ -58,23 +61,25 @@ class LinkedInJobsScraper:
         self.job_item_data = {}
         self.job_link = None
 
+    # Log in to LinkedIn
     def login(self):
         self.driver.maximize_window()
         self.driver.get(self.LOGIN_URL)
-
-        # Accept cookies
-        try:
-            self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, "artdeco-global-alert__action"))).click()
-            logging.info(f"Cookies accepted.")
-        except Exception as e:
-            logging.info(f"Cookies button not found. {e}")
         self.wait.until(EC.presence_of_element_located((By.XPATH, self.LOGIN_USERNAME_XPATH))).send_keys(self.username)
         self.wait.until(EC.presence_of_element_located((By.XPATH, self.LOGIN_PASSWORD_XPATH))).send_keys(self.password)
         self.wait.until(EC.element_to_be_clickable((By.XPATH, self.LOGIN_BUTTON_XPATH))).click()
         self.wait.until(EC.url_changes(self.LOGIN_URL))
 
     def scrape_job_item_details(self):
+        # Accept cookies
+        try:
+            self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, "artdeco-global-alert__action"))).click()
+            logging.info(f"Cookies accepted.")
+        except Exception as e:
+            logging.info(f"Cookies button not found. {e}")
         job_data_list_of_dict_all_pages = []
+
+        # Collect job offer information from multiple pages
         for page in range(2, self.LAST_PAGE):
             logging.info(f"Collecting job offer info just started on the page {page - 1}.")
             jobs_block = self.wait.until(
@@ -110,7 +115,7 @@ class LinkedInJobsScraper:
                             self.job_item_data['Job Title'] = job_title_elem.text.strip()
                             logging.info(f"Scraped information for Job Title: {self.job_item_data['Job Title']}")
                         else:
-                            self.job_item_data['Job Title'] = 'Error while scraping'
+                            self.job_item_data['Job Title'] = 'Null'
                             logging.warning('Job title not found.')
 
                         # Company Name
@@ -119,7 +124,7 @@ class LinkedInJobsScraper:
                             self.job_item_data['Company Name'] = company_name_elem.text.strip()
                             logging.info(f"Scraped information for Company Name: {self.job_item_data['Company Name']}")
                         else:
-                            self.job_item_data['Company Name'] = 'Error while scraping'
+                            self.job_item_data['Company Name'] = 'Null'
                             logging.warning('Company name not found.')
 
                         # Location
@@ -128,7 +133,7 @@ class LinkedInJobsScraper:
                             self.job_item_data['Location'] = location_elem.text.strip()
                             logging.info(f"Scraped information for Location: {self.job_item_data['Location']}")
                         else:
-                            self.job_item_data['Location'] = 'Error while scraping'
+                            self.job_item_data['Location'] = 'Null'
                             logging.warning('Location not found.')
 
                         # Job Type
@@ -137,7 +142,7 @@ class LinkedInJobsScraper:
                             self.job_item_data['Job Type'] = job_type_elem.text.strip()
                             logging.info(f"Scraped information for Job Type: {self.job_item_data['Job Type']}")
                         else:
-                            self.job_item_data['Job Type'] = 'Error while scraping'
+                            self.job_item_data['Job Type'] = 'Null'
                             logging.warning('Job type not found.')
 
                         # Post Aging
@@ -146,7 +151,7 @@ class LinkedInJobsScraper:
                             self.job_item_data['Post Aging'] = post_date_elem.text.strip()
                             logging.info(f"Scraped information for Post Aging: {self.job_item_data['Post Aging']}")
                         else:
-                            self.job_item_data['Post Aging'] = 'Error while scraping'
+                            self.job_item_data['Post Aging'] = 'Null'
                             logging.warning('Post Aging not found.')
 
                         # Applicant Count
@@ -161,9 +166,9 @@ class LinkedInJobsScraper:
                                     f" {self.job_item_data['Applicant Count']} applicants")
                             except ValueError:
                                 logging.warning(f"Could not parse applicant count from text: {applicant_count_text}")
-                                self.job_item_data['Applicant Count'] = 'Error while scraping'
+                                self.job_item_data['Applicant Count'] = 'Null'
                         else:
-                            self.job_item_data['Applicant Count'] = 'Error while scraping'
+                            self.job_item_data['Applicant Count'] = 'Null'
                             logging.warning('Applicant count not found.')
 
                         # Skills Required
@@ -188,10 +193,10 @@ class LinkedInJobsScraper:
                                             f"Scraped information for Skills Required:"
                                             f" {self.job_item_data['Skills Required']}")
                                     else:
-                                        self.job_item_data['Skills Required'] = 'Error while scraping'
+                                        self.job_item_data['Skills Required'] = 'Null'
                                         logging.warning('Skills Required not found.')
                                 else:
-                                    self.job_item_data['Skills Required'] = 'Error while scraping'
+                                    self.job_item_data['Skills Required'] = 'Null'
                                     logging.warning('Skills Required not found.')
                             finally:
                                 close_button = self.wait.until(EC.visibility_of_element_located(
@@ -202,8 +207,11 @@ class LinkedInJobsScraper:
                             logging.error(
                                 f'Error: Timeout occurred while waiting for skills to load on page:'
                                 f' {e}\nfor {self.job_link.get_attribute("href")}')
-                            self.job_item_data['Skills Required'] = 'Error while scraping'
+                            self.job_item_data['Skills Required'] = 'Null'
                         except NoSuchElementException as e:
+                            logging.error(
+                                f'Error: Element not found while scraping show_more_skills_button: {e}')
+                        except Exception as e:
                             logging.error(
                                 f'Error: Element not found while scraping show_more_skills_button: {e}')
 
@@ -215,7 +223,7 @@ class LinkedInJobsScraper:
                                 f"Scraped information for Job Description: "
                                 f"{(str(self.job_item_data['Job Description']))[:300]}")
                         else:
-                            self.job_item_data['Job Description'] = 'Error while scraping'
+                            self.job_item_data['Job Description'] = 'Null'
                             logging.info('Job description not found.')
 
                         # Job Link
@@ -224,12 +232,13 @@ class LinkedInJobsScraper:
                             self.job_item_data['Job Link'] = self.job_link.get_attribute("href")
                             logging.info(f"Job Link saved")
                         else:
-                            self.job_item_data['Job Link'] = 'Error while scraping'
+                            self.job_item_data['Job Link'] = 'Null'
                             logging.info(f"Job Link failed to be saved")
 
-                        # Add a row for df
+                        # Add a new dict to the list (a new row for the pandas df)
                         job_data_list_of_dict_all_pages.append(self.job_item_data)
-                        print(job_data_list_of_dict_all_pages)
+
+                        self.driver.execute_script("arguments[0].scrollIntoView();", each_job)
 
                     except TimeoutException as e:
                         logging.error(
@@ -249,28 +258,26 @@ class LinkedInJobsScraper:
                 logging.warning('Job List not found.')
 
             #  Click the next page functionality
-            self.driver.find_element(By.XPATH, f"//button[@aria-label='Page {page}']").click()
+            try:
+                self.driver.find_element(By.XPATH, f"//button[@aria-label='Page {page}']").click()  # dynamic path
+                # next_page_button_locator = (By.XPATH, f"//button[@aria-label='Page {page}']")  # dynamic path
+                # self.wait.until(EC.presence_of_element_located(next_page_button_locator))
+                # next_page_button = self.driver.find_element(By.XPATH, f"//button[@aria-label='Page {page}']")
+                # next_page_button.click()
+            except Exception as e:
+                logging.error(f'Failed to proceed to the next page: {page}: {e}')
 
-            #  self.driver.find_element(By.CSS_SELECTOR, f'button[aria-label="Page {page}"]').click()
-            # element = self.wait.until(
-            #     EC.presence_of_element_located((By.CSS_SELECTOR, f'button[aria-label="Page {page}"]')))
-            # actions = ActionChains(self.driver)
-            # actions.move_to_element(element).perform()
-            # element.click()
-
-            # page_2_button = self.wait.until(
-            #     EC.presence_of_element_located((By.CSS_SELECTOR, 'button[aria-label="Page 2"]')))
-            # # Use the wait object to wait for the element to be clickable
-            # page_2_button = wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'button[aria-label="Page 2"]')))
-            # # Click the button
-            # page_2_button.click()
         return job_data_list_of_dict_all_pages
 
     def scrape_jobs(self):
         try:
+            # Login to LinkedIn
             self.login()
+            # Navigate to job search page
             self.driver.get(self.JOB_SEARCH_URL)
+            # Scrape job details
             job_data_list_of_dict_for_df = self.scrape_job_item_details()
+            # Create pandas dataframe from job data and save to csv file
             df = pd.DataFrame(job_data_list_of_dict_for_df)
             print(df)
             df.to_csv('job_offers.csv', index=False)
@@ -278,6 +285,7 @@ class LinkedInJobsScraper:
         except Exception as e:
             logging.error(f'Error occurred while scraping jobs: {e}')
         finally:
+            # Close the driver and end the session
             self.driver.quit()
 
 
