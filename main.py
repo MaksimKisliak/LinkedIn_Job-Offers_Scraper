@@ -71,6 +71,8 @@ class LinkedInJobsScraper:
             self.job_link = each_job.find_element(By.TAG_NAME, self.JOB_LINK_TAGNAME)
             if self.job_link and str(self.job_link.get_attribute("href")).startswith("https://www.linkedin.com/jobs/view"):
                 logging.info(f'Scraped information for job link:\n{self.job_link.get_attribute("href")}')
+            else:
+                logging.info(f'Failed to scrap information for job link')
             html = self.driver.page_source
             soup = BeautifulSoup(html, 'html.parser')
 
@@ -83,7 +85,7 @@ class LinkedInJobsScraper:
             job_title_elem = job_description_header.find('h2', {'class': self.JOB_TITLE_CLASSNAME})
             if job_title_elem:
                 job_item_data['Job Title'] = job_title_elem.text.strip()
-                logging.info(f"Scraped information for {job_item_data['Job Title']}")
+                logging.info(f"Scraped information for Job Title: {job_item_data['Job Title']}")
             else:
                 job_item_data['Job Title'] = 'Error while scraping'
                 logging.warning('Job title not found.')
@@ -92,7 +94,7 @@ class LinkedInJobsScraper:
             company_name_elem = job_description_header.find('span', {'class': self.COMPANY_NAME_CLASSNAME})
             if company_name_elem:
                 job_item_data['Company Name'] = company_name_elem.text.strip()
-                logging.info(f"Scraped information for {job_item_data['Company Name']}")
+                logging.info(f"Scraped information for Company Name: {job_item_data['Company Name']}")
             else:
                 job_item_data['Company Name'] = 'Error while scraping'
                 logging.warning('Company name not found.')
@@ -101,7 +103,7 @@ class LinkedInJobsScraper:
             location_elem = job_description_header.find('span', {'class': self.LOCATION_CLASSNAME})
             if location_elem:
                 job_item_data['Location'] = location_elem.text.strip()
-                logging.info(f"Scraped information for {job_item_data['Location']}")
+                logging.info(f"Scraped information for Location: {job_item_data['Location']}")
             else:
                 job_item_data['Location'] = 'Error while scraping'
                 logging.warning('Location not found.')
@@ -110,7 +112,7 @@ class LinkedInJobsScraper:
             job_type_elem = job_description_header.find('span', {'class': self.JOB_TYPE_CLASSNAME})
             if job_type_elem:
                 job_item_data['Job Type'] = job_type_elem.text.strip()
-                logging.info(f"Scraped information for {job_item_data['Job Type']}")
+                logging.info(f"Scraped information for Job Type: {job_item_data['Job Type']}")
             else:
                 job_item_data['Job Type'] = 'Error while scraping'
                 logging.warning('Job type not found.')
@@ -119,7 +121,7 @@ class LinkedInJobsScraper:
             post_date_elem = job_description_header.find('span', {'class': self.POST_DATE_CLASSNAME})
             if post_date_elem:
                 job_item_data['Post Aging'] = post_date_elem.text.strip()
-                logging.info(f"Scraped information for {job_item_data['Post Aging']}")
+                logging.info(f"Scraped information for Post Aging: {job_item_data['Post Aging']}")
             else:
                 job_item_data['Post Aging'] = 'Error while scraping'
                 logging.warning('Post Aging not found.')
@@ -131,7 +133,7 @@ class LinkedInJobsScraper:
                 applicant_count_text = applicant_count_elem.text.strip()
                 try:
                     job_item_data['Applicant Count'] = int(applicant_count_text.split()[0])
-                    logging.info(f"Scraped information for {job_item_data['Applicant Count']} applicants")
+                    logging.info(f"Scraped information for Applicant Count: {job_item_data['Applicant Count']} applicants")
                 except ValueError:
                     logging.warning(f"Could not parse applicant count from text: {applicant_count_text}")
                     job_item_data['Applicant Count'] = 'Error while scraping'
@@ -157,7 +159,7 @@ class LinkedInJobsScraper:
                         skills_str_text = ', '.join(skill.text.strip() for skill in skill_list)
                         if skills_str_text:
                             job_item_data['Skills Required'] = skills_str_text
-                            logging.info(f"Scraped information for {job_item_data['Skills Required']}")
+                            logging.info(f"Scraped information for Skills Required: {job_item_data['Skills Required']}")
                         else:
                             job_item_data['Skills Required'] = 'Error while scraping'
                             logging.warning('Skills Required not found.')
@@ -179,10 +181,18 @@ class LinkedInJobsScraper:
             job_description_elem = soup.find('div', {'class': self.JOB_DESCRIPTION_CLASSNAME})
             if job_description_elem:
                 job_item_data['Job Description'] = job_description_elem.text.strip()
-                logging.info(f"Scraped information for {job_item_data['Job Description']}")
+                logging.info(f"Scraped information for Job Description: {str(job_item_data['Job Description'])[300]}")
             else:
                 job_item_data['Job Description'] = 'Error while scraping'
                 logging.info('Job description not found.')
+
+            # Job Link
+            if self.job_link and str(self.job_link.get_attribute("href")).startswith("https://www.linkedin.com/jobs/view"):
+                job_item_data['Job Link'] = self.job_link.get_attribute("href")
+                logging.info(f"Job Link saved")
+            else:
+                job_item_data['Job Link'] = 'Error while scraping'
+                logging.info(f"Job Link failed to be saved")
 
         except TimeoutException as e:
             logging.error(f'Error: Timeout occurred while waiting for an element to load on page: {e}\nfor {self.job_link.get_attribute("href")}')
@@ -191,7 +201,7 @@ class LinkedInJobsScraper:
         except Exception as e:
             logging.error(f'Error occurred while scraping job information: {e}\nfor {self.job_link.get_attribute("href")}')
         finally:
-            logging.info(f'Scraping a Job Offer DONE for:\n{self.job_link.get_attribute("href")}')
+            logging.info(f'Scraping a Job Offer DONE.')
         return job_item_data
 
     def scrape_jobs_info(self) -> []:
