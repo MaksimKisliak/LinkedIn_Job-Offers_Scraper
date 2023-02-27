@@ -181,7 +181,7 @@ class LinkedInJobsScraper:
             job_description_elem = soup.find('div', {'class': self.JOB_DESCRIPTION_CLASSNAME})
             if job_description_elem:
                 job_item_data['Job Description'] = job_description_elem.text.strip()
-                logging.info(f"Scraped information for Job Description: {str(job_item_data['Job Description'])[300]}")
+                logging.info(f"Scraped information for Job Description: {(str(job_item_data['Job Description']))[300]}")
             else:
                 job_item_data['Job Description'] = 'Error while scraping'
                 logging.info('Job description not found.')
